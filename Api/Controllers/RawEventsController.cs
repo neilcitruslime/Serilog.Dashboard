@@ -2,11 +2,19 @@ using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Serilog.Dashboard.Api.Models;
+using Serilog.Dashboard.Api.Services;
+using Microsoft.Extensions.Options;
 
 [ApiController]
 [Route("api/events/raw")]
 public class RawEventsController : ControllerBase
 {
+    private readonly ClickHouseLogService _logService;
+    public RawEventsController(ClickHouseLogService logService)
+    {
+        _logService = logService;
+    }
+
     [HttpPost]
     public async Task<IActionResult> Post()
     {
@@ -41,7 +49,7 @@ public class RawEventsController : ControllerBase
                 return BadRequest("No valid log events found.");
             }
 
-            LogEventsToConsole(logEvents);
+            await _logService.InsertLogsAsync(logEvents);
             return NoContent();
         }
         catch (Exception ex)
@@ -88,45 +96,32 @@ public class RawEventsController : ControllerBase
         evt.TryGetValue("@mt", out var mtVal);
         var properties = evt.Where(p => !p.Key.StartsWith("@") && p.Key != "MessageTemplate")
                             .ToDictionary(p => p.Key, p => p.Value);
-        return new SerilogEvent()
-        {
-            Timestamp = tVal.ValueKind == JsonValueKind.String && DateTime.TryParse(tVal.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var ts) ? ts : DateTime.UtcNow,
-            Level = lVal.ValueKind == JsonValueKind.String ? lVal.GetString() : null,
-            Message = mVal.ValueKind == JsonValueKind.String ? mVal.GetString() : null,
-            MessageTemplate = mtVal.ValueKind == JsonValueKind.String ? mtVal.GetString() : null,
-            Properties = properties.Count > 0 ? properties : null,
-            ClientId = 0, // Placeholder, adjust as needed
-            InstanceId = 0, // Placeholder, adjust as needed
-        };
-    }
 
-    private void LogEventsToConsole(List<SerilogEvent> logEvents)
-    {
-        foreach (var evt in logEvents)
+        // Expand message template if present
+        string? expandedMessage = null;
+        if (mtVal.ValueKind == JsonValueKind.String)
         {
-            var timestamp = evt.Timestamp?.ToString() ?? "n/a";
-            var level = evt.Level ?? "Information";
-            var template = !string.IsNullOrWhiteSpace(evt.Message) ? evt.Message :
-                          !string.IsNullOrWhiteSpace(evt.MessageTemplate) ? evt.MessageTemplate :
-                          "[No message]";
-            var message = Regex.Replace(template, @"{(?<token>[^}:]+)(:[^}]+)?}", match =>
+            var template = mtVal.GetString() ?? string.Empty;
+            expandedMessage = Regex.Replace(template, @"{(?<token>[^}:]+)(:[^}]+)?}", match =>
             {
                 var token = match.Groups["token"].Value;
-                if (evt.Properties != null && evt.Properties.TryGetValue(token, out var value))
+                if (properties.TryGetValue(token, out var value))
                 {
                     return value.ToString();
                 }
                 return match.Value; // Leave token as-is if not found
             });
-            Console.WriteLine($"[{timestamp}] {level}: {message}");
-            if (evt.Properties != null && evt.Properties.Count > 0)
-            {
-                Console.WriteLine("  • Properties:");
-                foreach (var prop in evt.Properties)
-                {
-                    Console.WriteLine($"    - {prop.Key}: {prop.Value}");
-                }
-            }
         }
+
+        return new SerilogEvent()
+        {
+            Timestamp = tVal.ValueKind == JsonValueKind.String && DateTime.TryParse(tVal.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var ts) ? ts : DateTime.UtcNow,
+            Level = lVal.ValueKind == JsonValueKind.String ? lVal.GetString() : null,
+            Message = mVal.ValueKind == JsonValueKind.String ? mVal.GetString() : expandedMessage,
+            MessageTemplate = mtVal.ValueKind == JsonValueKind.String ? mtVal.GetString() : null,
+            Properties = properties.Count > 0 ? properties : null,
+            ClientId = 0, // Placeholder, adjust as needed
+            InstanceId = 0, // Placeholder, adjust as needed
+        };
     }
 }

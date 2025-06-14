@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Serilog.Dashboard.Api.Config;
+using Serilog.Dashboard.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +15,10 @@ builder.Services.AddSwaggerGen();
 
 // Add controllers
 builder.Services.AddControllers();
+
+// Register ClickHouse options and log service
+builder.Services.Configure<ClickHouseOptions>(builder.Configuration.GetSection("ClickHouse"));
+builder.Services.AddSingleton<ClickHouseLogService>();
 
 var app = builder.Build();
 
