@@ -34,3 +34,4 @@
 /Users/neilmcquillan/Code/Serilog.Dashboard/Api/bin/Debug/net9.0/Swashbuckle.AspNetCore.Swagger.dll
 /Users/neilmcquillan/Code/Serilog.Dashboard/Api/bin/Debug/net9.0/Swashbuckle.AspNetCore.SwaggerGen.dll
 /Users/neilmcquillan/Code/Serilog.Dashboard/Api/bin/Debug/net9.0/Swashbuckle.AspNetCore.SwaggerUI.dll
+/Users/neilmcquillan/Code/Serilog.Dashboard/Api/obj/Debug/net9.0/Api.sourcelink.json

@@ -88,13 +88,16 @@ public class RawEventsController : ControllerBase
         evt.TryGetValue("@mt", out var mtVal);
         var properties = evt.Where(p => !p.Key.StartsWith("@") && p.Key != "MessageTemplate")
                             .ToDictionary(p => p.Key, p => p.Value);
-        return new SerilogEvent(
-            tVal.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(tVal.GetString(), out var ts) ? ts : null,
-            lVal.ValueKind == JsonValueKind.String ? lVal.GetString() : null,
-            mVal.ValueKind == JsonValueKind.String ? mVal.GetString() : null,
-            mtVal.ValueKind == JsonValueKind.String ? mtVal.GetString() : null,
-            properties.Count > 0 ? properties : null
-        );
+        return new SerilogEvent()
+        {
+            Timestamp = tVal.ValueKind == JsonValueKind.String && DateTime.TryParse(tVal.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var ts) ? ts : DateTime.UtcNow,
+            Level = lVal.ValueKind == JsonValueKind.String ? lVal.GetString() : null,
+            Message = mVal.ValueKind == JsonValueKind.String ? mVal.GetString() : null,
+            MessageTemplate = mtVal.ValueKind == JsonValueKind.String ? mtVal.GetString() : null,
+            Properties = properties.Count > 0 ? properties : null,
+            ClientId = 0, // Placeholder, adjust as needed
+            InstanceId = 0, // Placeholder, adjust as needed
+        };
     }
 
     private void LogEventsToConsole(List<SerilogEvent> logEvents)

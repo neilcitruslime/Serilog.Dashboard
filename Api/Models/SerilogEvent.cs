@@ -1,12 +1,15 @@
 using System.Text.Json;
 
-namespace Serilog.Dashboard.Api.Models
+namespace Serilog.Dashboard.Api.Models;
+
+public class SerilogEvent
 {
-    public record SerilogEvent(
-        DateTimeOffset? Timestamp,
-        string? Level,
-        string? Message,
-        string? MessageTemplate,
-        Dictionary<string, JsonElement>? Properties
-    );
+    public required long ClientId;
+    public required long InstanceId;
+    public required DateTime Timestamp;
+    public string? Level;
+    public string? Message;
+    public string? MessageTemplate;
+    public Dictionary<string, JsonElement>? Properties;
+    public string EventId = Guid.NewGuid().ToString();
 }
