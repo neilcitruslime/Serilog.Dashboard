@@ -4,15 +4,16 @@ using System.Text.RegularExpressions;
 using Serilog.Dashboard.Api.Models;
 using Serilog.Dashboard.Api.Services;
 using Microsoft.Extensions.Options;
+using Api.Interfaces;
 
 [ApiController]
 [Route("api/events/raw")]
 public class RawEventsController : ControllerBase
 {
-    private readonly ClickHouseLogService _logService;
-    public RawEventsController(ClickHouseLogService logService)
+    private readonly ILogStoreService logService;
+    public RawEventsController(ILogStoreService logService)
     {
-        _logService = logService;
+        this.logService = logService;
     }
 
     [HttpPost]
@@ -49,7 +50,7 @@ public class RawEventsController : ControllerBase
                 return BadRequest("No valid log events found.");
             }
 
-            await _logService.InsertLogsAsync(logEvents);
+            await logService.InsertLogsAsync(logEvents);
             return NoContent();
         }
         catch (Exception ex)
@@ -66,7 +67,10 @@ public class RawEventsController : ControllerBase
         {
             var parsedArray = JsonSerializer.Deserialize<List<Dictionary<string, JsonElement>>>(rawBody);
             if (parsedArray is not null)
-                logEvents.AddRange(parsedArray.Select(ParseSerilogEvent));
+            {
+                   logEvents.AddRange(parsedArray.Select(evt => ParseSerilogEvent(evt)));
+            }
+             
         }
         catch
         {
@@ -90,19 +94,20 @@ public class RawEventsController : ControllerBase
 
     private SerilogEvent ParseSerilogEvent(Dictionary<string, JsonElement> evt)
     {
-        evt.TryGetValue("@t", out var tVal);
-        evt.TryGetValue("@l", out var lVal);
-        evt.TryGetValue("@m", out var mVal);
-        evt.TryGetValue("@mt", out var mtVal);
+        evt.TryGetValue("@t", out var timestampElement);
+        evt.TryGetValue("@l", out var levelElement);
+        evt.TryGetValue("@m", out var messageElement);
+        evt.TryGetValue("@mt", out var messageTemplateElement);
+        evt.TryGetValue("@mx", out var exceptionElement);
         var properties = evt.Where(p => !p.Key.StartsWith("@") && p.Key != "MessageTemplate")
                             .ToDictionary(p => p.Key, p => p.Value);
 
         // Expand message template if present
         string? expandedMessage = null;
-        if (mtVal.ValueKind == JsonValueKind.String)
+        if (messageTemplateElement.ValueKind == JsonValueKind.String)
         {
-            var template = mtVal.GetString() ?? string.Empty;
-            expandedMessage = Regex.Replace(template, @"{(?<token>[^}:]+)(:[^}]+)?}", match =>
+            var messageTemplate = messageTemplateElement.GetString() ?? string.Empty;
+            expandedMessage = Regex.Replace(messageTemplate, @"{(?<token>[^}:]+)(:[^}]+)?}", match =>
             {
                 var token = match.Groups["token"].Value;
                 if (properties.TryGetValue(token, out var value))
@@ -115,13 +120,14 @@ public class RawEventsController : ControllerBase
 
         return new SerilogEvent()
         {
-            Timestamp = tVal.ValueKind == JsonValueKind.String && DateTime.TryParse(tVal.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var ts) ? ts : DateTime.UtcNow,
-            Level = lVal.ValueKind == JsonValueKind.String ? lVal.GetString() : null,
-            Message = mVal.ValueKind == JsonValueKind.String ? mVal.GetString() : expandedMessage,
-            MessageTemplate = mtVal.ValueKind == JsonValueKind.String ? mtVal.GetString() : null,
+            Timestamp = timestampElement.ValueKind == JsonValueKind.String && DateTime.TryParse(timestampElement.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var ts) ? ts : DateTime.UtcNow,
+            Level = levelElement.ValueKind == JsonValueKind.String ? levelElement.GetString() : null,
+            Message = messageElement.ValueKind == JsonValueKind.String ? messageElement.GetString() : expandedMessage,
+            MessageTemplate = messageTemplateElement.ValueKind == JsonValueKind.String ? messageTemplateElement.GetString() : null,
             Properties = properties.Count > 0 ? properties : null,
             ClientId = 0, // Placeholder, adjust as needed
             InstanceId = 0, // Placeholder, adjust as needed
+            ExceptionInformation = exceptionElement.ValueKind == JsonValueKind.String ? exceptionElement.GetString() : null
         };
     }
 }

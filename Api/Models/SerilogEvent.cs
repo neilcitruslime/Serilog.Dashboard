@@ -12,4 +12,5 @@ public class SerilogEvent
     public string? MessageTemplate;
     public Dictionary<string, JsonElement>? Properties;
     public string EventId = Guid.NewGuid().ToString();
+    public string? ExceptionInformation { get; internal set; }
 }

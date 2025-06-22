@@ -1,12 +1,13 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using Api.Interfaces;
 using Microsoft.Extensions.Options;
 using Serilog.Dashboard.Api.Config;
 using Serilog.Dashboard.Api.Models;
 
 namespace Serilog.Dashboard.Api.Services
 {
-    public class ClickHouseLogService
+    public class ClickHouseLogService : ILogStoreService
     {
         private readonly ClickHouseOptions _options;
         private readonly HttpClient _httpClient;
@@ -23,7 +24,7 @@ namespace Serilog.Dashboard.Api.Services
 
         public async Task InsertLogsAsync(IEnumerable<SerilogEvent> events)
         {
-            var insertSql = $"INSERT INTO {_options.Table} (ClientId, InstanceId, Timestamp, Level, Message, MessageTemplate, Properties, EventId) VALUES ";
+            var insertSql = $"INSERT INTO {_options.Table} (ClientId, InstanceId, Timestamp, Level, Message, MessageTemplate, Properties, EventId, Raw) VALUES ";
             var values = new List<string>();
             foreach (var evt in events)
             {

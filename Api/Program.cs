@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Api.Interfaces;
 using Serilog.Dashboard.Api.Config;
 using Serilog.Dashboard.Api.Services;
 
@@ -16,9 +17,13 @@ builder.Services.AddSwaggerGen();
 // Add controllers
 builder.Services.AddControllers();
 
-// Register ClickHouse options and log service
+// Configure log services
 builder.Services.Configure<ClickHouseOptions>(builder.Configuration.GetSection("ClickHouse"));
-builder.Services.AddSingleton<ClickHouseLogService>();
+builder.Services.Configure<PostgresOptions>(builder.Configuration.GetSection("Postgres"));
+
+// Use PostgreSQL instead of ClickHouse
+// builder.Services.AddSingleton<ILogStoreService, ClickHouseLogService>(); // Comment out this line
+builder.Services.AddSingleton<ILogStoreService, PostgresLogService>(); // Add this line
 
 var app = builder.Build();
 
